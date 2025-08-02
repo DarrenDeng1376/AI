@@ -50,7 +50,7 @@ class AzureSearchExample:
             SearchableField(name="author", type=SearchFieldDataType.String),
             SearchableField(name="description", type=SearchFieldDataType.String),
             SimpleField(name="category", type=SearchFieldDataType.String, filterable=True),
-            SimpleField(name="rating", type=SearchFieldDataType.Double, sortable=True),
+            SimpleField(name="rating", type=SearchFieldDataType.Double, sortable=True, filterable=True),
         ]
         
         index = SearchIndex(name=self.index_name, fields=fields)
@@ -202,7 +202,7 @@ def main():
         search_example.filtered_search("novel", category_filter="Fiction", min_rating=4.0)
         
         # Optional: Clean up (uncomment if you want to delete the index)
-        # search_example.delete_index()
+        search_example.delete_index()
         
     except Exception as e:
         print(f"An error occurred: {e}")

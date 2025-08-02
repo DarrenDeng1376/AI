@@ -58,6 +58,24 @@ The example performs these searches:
 - Search for "love romance" (finds romantic novels)
 - Filtered search for "novel" in Fiction category with rating >= 4.0
 
+## Additional Examples
+
+### 🧠 Semantic vs Vector Search
+See [`SEMANTIC_VS_VECTOR_SEARCH.md`](SEMANTIC_VS_VECTOR_SEARCH.md) for detailed comparison
+
+**Demo Files:**
+- [`semantic_search_demo.py`](semantic_search_demo.py) - Built-in semantic search
+- [`vector_search_demo.py`](vector_search_demo.py) - Custom vector search with embeddings
+
+### 🔍 Search Comparisons
+- [`simple_search_comparison.py`](simple_search_comparison.py) - Traditional vs semantic search
+- [`vector_vs_traditional_demo.py`](vector_vs_traditional_demo.py) - Full comparison with mock embeddings
+
+### 📚 Learning Resources
+- [`why_vector_search.py`](why_vector_search.py) - Understanding when vector search is needed
+- [`vector_search_explained.py`](vector_search_explained.py) - Concept explanations
+- [`LLM_INTEGRATION_GUIDE.md`](LLM_INTEGRATION_GUIDE.md) - LLM integration patterns
+
 ## Customization
 
 You can modify the example to:
