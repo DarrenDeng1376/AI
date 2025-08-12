@@ -1,0 +1,46 @@
+# LangChain Learning Requirements
+
+# Core LangChain packages
+langchain>=0.1.0
+langchain-community>=0.0.10
+langchain-core>=0.1.0
+
+# Azure OpenAI (Primary)
+langchain-openai>=0.0.5
+openai>=1.0.0
+azure-identity>=1.15.0
+
+# Alternative LLM Providers
+langchain-anthropic>=0.1.0
+langchain-google-genai>=0.0.5
+
+# Vector Stores
+langchain-chroma>=0.1.0
+langchain-pinecone>=0.0.3
+faiss-cpu>=1.7.4
+
+# Document Processing
+langchain-text-splitters>=0.0.1
+pypdf>=3.17.0
+python-docx>=1.1.0
+
+# Web and API Tools
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+selenium>=4.15.0
+
+# Utilities
+python-dotenv>=1.0.0
+streamlit>=1.28.0
+gradio>=4.0.0
+
+# Development
+jupyter>=1.0.0
+notebook>=7.0.0
+ipywidgets>=8.1.0
+
+# Optional: For advanced features
+redis>=5.0.0
+sqlalchemy>=2.0.0
+pandas>=2.1.0
+numpy>=1.24.0
