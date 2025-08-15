@@ -363,7 +363,7 @@ if __name__ == "__main__":
         print()
         
         # Run examples (structured_output_example commented out as it requires specific schema parsing)
-        # structured_output_example()
+        structured_output_example()
         few_shot_learning_example()
         chain_of_thought_example()
         role_based_prompts_example()

@@ -278,7 +278,7 @@ def custom_prompt_rag_example():
         TechCorp's customer support operates 24/7 with response time guaranteed within 2 hours. 
         The company offers tiered pricing: Starter ($99/month), Professional ($299/month), 
         and Enterprise (custom pricing). All plans include free onboarding and training.
-        """
+        """)
     ]
     
     # Create vector store
