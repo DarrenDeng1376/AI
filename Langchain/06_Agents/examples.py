@@ -22,8 +22,94 @@ import json
 import time
 from datetime import datetime
 import random
+from pydantic import BaseModel, Field
 
 load_dotenv()
+
+# Tool Selection Demonstration
+def demonstrate_tool_selection():
+    """
+    Show exactly how the LLM decides which tools to call
+    """
+    print("=== Tool Selection Demonstration ===")
+    print("Let's see how the LLM chooses tools based on query analysis...\n")
+    
+    from langchain_core.tools import tool
+    
+    # Define some example tools
+    @tool
+    def math_calculator(expression: str) -> str:
+        """Perform mathematical calculations"""
+        return f"Math result: {expression} = [calculated value]"
+    
+    @tool  
+    def text_analyzer(text: str) -> str:
+        """Analyze text for word count, length, etc."""
+        return f"Text analysis: '{text}' has [analysis results]"
+    
+    @tool
+    def web_searcher(query: str) -> str:
+        """Search the web for information"""
+        return f"Web search results for: {query}"
+    
+    tools = [math_calculator, text_analyzer, web_searcher]
+    llm = create_azure_chat_openai(temperature=0.1)
+    
+    # Show tool schemas
+    print("🔧 Available Tool Schemas (what the LLM sees):")
+    for tool in tools:
+        print(f"\n📋 {tool.name}:")
+        print(f"   Description: {tool.description}")
+        print(f"   Input: {tool.args}")
+    
+    print("\n" + "="*60)
+    
+    # Test different query types
+    test_cases = [
+        {
+            "query": "What is 25 * 4?",
+            "expected_tool": "math_calculator",
+            "reasoning": "Contains mathematical expression"
+        },
+        {
+            "query": "How many words are in 'Hello world example'?", 
+            "expected_tool": "text_analyzer",
+            "reasoning": "Asks about text analysis"
+        },
+        {
+            "query": "Find information about Python programming",
+            "expected_tool": "web_searcher", 
+            "reasoning": "Requests information search"
+        },
+        {
+            "query": "Calculate 10+5 and analyze the text 'AI is amazing'",
+            "expected_tool": "math_calculator + text_analyzer",
+            "reasoning": "Requires both calculation and text analysis"
+        }
+    ]
+    
+    print("\n🧠 Tool Selection Analysis:")
+    print("For each query, the LLM analyzes the intent and selects appropriate tools:\n")
+    
+    for i, case in enumerate(test_cases, 1):
+        print(f"Test {i}:")
+        print(f"  Query: '{case['query']}'")
+        print(f"  Expected Tool: {case['expected_tool']}")
+        print(f"  Reasoning: {case['reasoning']}")
+        print(f"  LLM Decision Process:")
+        print(f"    1. Parse query intent: {'math' if 'calculate' in case['query'].lower() or any(op in case['query'] for op in ['+', '-', '*', '/', '=']) else 'text' if 'word' in case['query'].lower() or 'text' in case['query'].lower() else 'search'}")
+        print(f"    2. Match intent to tool capabilities")
+        print(f"    3. Generate function call with appropriate parameters")
+        print("-" * 50)
+    
+    print("\n💡 Key Selection Factors:")
+    print("1. 🎯 Keyword Matching: LLM looks for keywords in tool descriptions")
+    print("2. 🧩 Intent Recognition: Understands what the user wants to accomplish") 
+    print("3. 📊 Parameter Compatibility: Checks if query provides needed parameters")
+    print("4. 🔗 Multi-tool Coordination: Can call multiple tools for complex queries")
+    print("5. 🎪 Context Awareness: Uses conversation history for better decisions")
+    
+    print("\n" + "="*60 + "\n")
 
 # Example 1: Basic Tool-Calling Agent
 def basic_tool_agent_example():
@@ -88,15 +174,25 @@ def basic_tool_agent_example():
     agent = create_tool_calling_agent(llm, tools, prompt)
     agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
     
+    # Let's also show the tool schemas that the LLM sees
+    print("🔧 Available Tools and Their Schemas:")
+    for tool in tools:
+        print(f"\nTool: {tool.name}")
+        print(f"Description: {tool.description}")
+        print(f"Parameters: {tool.args}")
+        print("-" * 40)
+    
     # Test queries
     test_queries = [
-        "What is 15 * 23 + 7?",
-        "Count the words in this sentence: 'LangChain agents are powerful tools for automation.'",
-        "What time is it right now?",
-        "Calculate 2^10 and tell me what time it is"
+        "What is 15 * 23 + 7?",  # Should trigger calculator
+        "Count the words in this sentence: 'LangChain agents are powerful tools for automation.'",  # Should trigger word_counter
+        "What time is it right now?",  # Should trigger current_time
+        "Calculate 2^10 and tell me what time it is"  # Should trigger BOTH calculator AND current_time
     ]
     
-    print("🤖 Tool-Calling Agent Results:")
+    print("\n🤖 Tool-Calling Agent Results:")
+    print("Watch how the LLM decides which tools to call based on the query content:")
+    print("=" * 80)
     
     for i, query in enumerate(test_queries, 1):
         print(f"\n🔍 Query {i}: {query}")
@@ -164,12 +260,36 @@ def react_agent_example():
         return analysis
     
     @tool
-    def knowledge_synthesizer(topic: str, sources: str) -> str:
-        """Synthesize information from multiple sources about a topic"""
-        return f"Knowledge Synthesis for '{topic}':\n" \
-               f"Based on available sources, here's a comprehensive overview:\n" \
-               f"Sources analyzed: {sources[:200]}...\n" \
-               f"Synthesis: This topic involves multiple interconnected concepts that require careful analysis."
+    def knowledge_synthesizer(topic_and_sources: str) -> str:
+        """Synthesize information from multiple sources about a topic.
+        
+        Input format: 'topic: [topic name] | sources: [sources description]'
+        Example: 'topic: LangChain framework | sources: web search results about LangChain features'
+        
+        Args:
+            topic_and_sources: Combined topic and sources in the format 'topic: X | sources: Y'
+        """
+        try:
+            # Parse the input string
+            if ' | sources: ' in topic_and_sources:
+                parts = topic_and_sources.split(' | sources: ', 1)
+                topic = parts[0].replace('topic: ', '').strip()
+                sources = parts[1].strip()
+            elif 'topic:' in topic_and_sources.lower():
+                # Handle cases where user might not include sources
+                topic = topic_and_sources.replace('topic:', '').strip()
+                sources = "general research and analysis"
+            else:
+                # Treat entire input as topic if no format specified
+                topic = topic_and_sources.strip()
+                sources = "general research and analysis"
+            
+            return f"Knowledge Synthesis for '{topic}':\n" \
+                   f"Based on available sources, here's a comprehensive overview:\n" \
+                   f"Sources analyzed: {sources[:200]}...\n" \
+                   f"Synthesis: This topic involves multiple interconnected concepts that require careful analysis."
+        except Exception as e:
+            return f"Error in knowledge synthesis: {str(e)}"
     
     tools = [web_search, document_analyzer, knowledge_synthesizer]
     
@@ -189,6 +309,14 @@ def react_agent_example():
     ... (this Thought/Action/Action Input/Observation can repeat N times)
     Thought: I now know the final answer
     Final Answer: the final answer to the original input question
+
+    IMPORTANT - Tool Input Formats:
+    - web_search: "search query text"
+    - document_analyzer: "text to analyze"
+    - knowledge_synthesizer: "topic: [topic name] | sources: [sources description]"
+
+    For knowledge_synthesizer, use this exact format:
+    "topic: LangChain framework | sources: web search results about LangChain features and applications"
 
     Begin!
 
@@ -260,8 +388,8 @@ def custom_tools_example():
     
     # Custom tool implementations
     class DataAnalyzer(BaseTool):
-        name = "data_analyzer"
-        description = "Analyze numerical data with statistical operations"
+        name: str = "data_analyzer"
+        description: str = "Analyze numerical data with statistical operations"
         args_schema: Type[BaseModel] = DataAnalysisInput
         
         def _run(self, data: List[float], analysis_type: str) -> str:
@@ -293,8 +421,8 @@ def custom_tools_example():
                 return f"Error in data analysis: {str(e)}"
     
     class TextProcessor(BaseTool):
-        name = "text_processor"
-        description = "Process and manipulate text in various ways"
+        name: str = "text_processor"
+        description: str = "Process and manipulate text in various ways"
         args_schema: Type[BaseModel] = TextProcessingInput
         
         def _run(self, text: str, operation: str, options: Dict[str, Any] = {}) -> str:
@@ -329,8 +457,8 @@ def custom_tools_example():
                 return f"Error in text processing: {str(e)}"
     
     class TaskPlanner(BaseTool):
-        name = "task_planner"
-        description = "Create structured plans for achieving goals"
+        name: str = "task_planner"
+        description: str = "Create structured plans for achieving goals"
         args_schema: Type[BaseModel] = TaskPlannerInput
         
         def _run(self, goal: str, constraints: List[str] = [], deadline: Optional[str] = None) -> str:
@@ -742,7 +870,7 @@ if __name__ == "__main__":
     print("=" * 70)
     
     try:
-        # Test Azure OpenAI connection first
+      #   # Test Azure OpenAI connection first
         print("🔍 Testing Azure OpenAI connection...")
         test_llm = create_azure_chat_openai()
         test_response = test_llm.invoke("Hello!")
@@ -750,10 +878,11 @@ if __name__ == "__main__":
         print()
         
         # Run all agent examples
-        basic_tool_agent_example()
-        react_agent_example()
-        custom_tools_example()
-        multi_agent_example()
+        # demonstrate_tool_selection()  # New: Show how tool selection works
+        # basic_tool_agent_example()
+        # react_agent_example()
+        # custom_tools_example()
+        # multi_agent_example()
         agent_memory_example()
         
         print("🎉 All modern agent examples completed!")

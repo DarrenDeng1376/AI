@@ -160,8 +160,9 @@ def create_hierarchical_system():
     
     # Supervisor Agent Tools
     @tool
-    def delegate_task(task_description: str, priority: str, agent_type: str) -> str:
-        """Delegate a task to appropriate worker agent"""
+    def delegate_task(task_description: str, priority: str = "medium", agent_type: str = "general") -> str:
+        """Delegate a task to appropriate worker agent and execute it"""
+        # Create task object
         task = {
             "description": task_description,
             "priority": getattr(TaskPriority, priority.upper(), TaskPriority.MEDIUM),
@@ -169,12 +170,39 @@ def create_hierarchical_system():
             "timestamp": datetime.now().isoformat()
         }
         
+        # Find and assign agent
         selected_agent = orchestrator.assign_task(task)
         
-        if selected_agent:
-            return f"Task delegated to {selected_agent}: {task_description}"
-        else:
-            return f"No available agent for task: {task_description}"
+        if not selected_agent:
+            return f"❌ No available agent for task: {task_description}"
+        
+        # Execute task on selected agent
+        try:
+            start_time = time.time()
+            agent_executor = orchestrator.agents[selected_agent]["executor"]
+            
+            # Create appropriate input for the agent based on type
+            if agent_type == "research":
+                agent_input = f"Please research: {task_description}"
+            elif agent_type == "analysis":
+                agent_input = f"Please analyze: {task_description}"
+            elif agent_type == "writing":
+                agent_input = f"Please write: {task_description}"
+            else:
+                agent_input = task_description
+            
+            # Execute the task
+            result = agent_executor.invoke({"input": agent_input})
+            response_time = time.time() - start_time
+            
+            # Mark task as completed
+            orchestrator.complete_task(selected_agent, True, response_time)
+            
+            return f"✅ Task completed by {selected_agent}:\n{result['output']}"
+            
+        except Exception as e:
+            orchestrator.complete_task(selected_agent, False, time.time() - start_time)
+            return f"❌ Error executing task on {selected_agent}: {str(e)}"
     
     @tool
     def monitor_agents() -> str:
@@ -204,13 +232,26 @@ def create_hierarchical_system():
     # Create Supervisor Agent
     supervisor_prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a supervisor agent responsible for task delegation and monitoring.
-        Your role is to:
-        1. Receive high-level requests from users
-        2. Break them down into specific tasks
-        3. Delegate tasks to appropriate worker agents
-        4. Monitor progress and handle escalations
-        
-        Always explain your delegation decisions."""),
+
+Your role is to:
+1. Receive requests from users
+2. Determine which type of agent can best handle the task
+3. Delegate tasks using the delegate_task tool
+4. Monitor system status when requested
+
+Available agent types:
+- research: For gathering information, investigating topics, finding sources
+- analysis: For analyzing data, finding patterns, making calculations  
+- writing: For creating content, reports, summaries, documentation
+- general: For basic tasks that don't require specialization
+
+When delegating tasks:
+- Use delegate_task(task_description, priority, agent_type)
+- Priority can be: "low", "medium", "high", "critical"
+- Be specific about what the agent should do
+- Choose the most appropriate agent type
+
+For monitoring requests, use the monitor_agents tool."""),
         ("placeholder", "{chat_history}"),
         ("human", "{input}"),
         ("placeholder", "{agent_scratchpad}")
@@ -258,9 +299,10 @@ def create_hierarchical_system():
     
     # Test hierarchical system
     test_requests = [
-        "I need a comprehensive report on artificial intelligence trends",
-        "Analyze the performance data and create a summary",
-        "Check the current status of all worker agents"
+        "Research artificial intelligence trends for 2024",
+        "Analyze sales performance data from last quarter", 
+        "Write a summary of our project findings",
+        "Show me the current status of all agents"
     ]
     
     print("🏢 Hierarchical Agent System Results:")
@@ -273,12 +315,7 @@ def create_hierarchical_system():
             result = supervisor_executor.invoke({"input": request})
             print(f"🎯 Supervisor Response: {result['output']}")
             
-            # Simulate task completion
-            if "report" in request.lower():
-                orchestrator.complete_task("researcher", True, 2.5)
-                orchestrator.complete_task("writer", True, 3.0)
-            elif "analyze" in request.lower():
-                orchestrator.complete_task("analyst", True, 1.8)
+            # Note: Task completion is now handled automatically in the delegate_task tool
             
         except Exception as e:
             print(f"❌ Error: {e}")
@@ -659,7 +696,7 @@ if __name__ == "__main__":
         print()
         
         # Run orchestration examples
-        create_hierarchical_system()
+        # create_hierarchical_system()
         create_workflow_system()
         
         # Run async collaboration example

@@ -33,14 +33,13 @@ class DatabaseQueryInput(BaseModel):
     limit: Optional[int] = Field(default=10, description="Maximum number of results")
 
 class DatabaseQueryTool(BaseTool):
-    name = "database_query"
-    description = "Query database tables safely with validation"
+    name: str = "database_query"
+    description: str = "Query database tables safely with validation"
     args_schema: Type[BaseModel] = DatabaseQueryInput
     
-    def __init__(self):
-        super().__init__()
-        # Mock database with sample data
-        self.mock_db = {
+    def get_mock_db(self):
+        """Get mock database data"""
+        return {
             "users": [
                 {"id": 1, "name": "Alice", "email": "alice@example.com", "role": "admin"},
                 {"id": 2, "name": "Bob", "email": "bob@example.com", "role": "user"},
@@ -59,11 +58,12 @@ class DatabaseQueryTool(BaseTool):
     
     def _run(self, query_type: str, table: str, conditions: Dict[str, Any] = {}, limit: int = 10) -> str:
         try:
+            mock_db = self.get_mock_db()
             # Validate table exists
-            if table not in self.mock_db:
-                return f"Error: Table '{table}' not found. Available tables: {list(self.mock_db.keys())}"
+            if table not in mock_db:
+                return f"Error: Table '{table}' not found. Available tables: {list(mock_db.keys())}"
             
-            data = self.mock_db[table]
+            data = mock_db[table]
             
             if query_type == "select":
                 # Apply conditions
@@ -116,14 +116,13 @@ class FileProcessingInput(BaseModel):
     options: Optional[Dict[str, Any]] = Field(default={}, description="Additional options")
 
 class FileProcessingTool(BaseTool):
-    name = "file_processor"
-    description = "Process files with format detection and validation"
+    name: str = "file_processor"
+    description: str = "Process files with format detection and validation"
     args_schema: Type[BaseModel] = FileProcessingInput
     
-    def __init__(self):
-        super().__init__()
-        # Mock file system for demo
-        self.mock_files = {
+    def get_mock_files(self):
+        """Get mock file system data"""
+        return {
             "data.csv": "name,age,city\nAlice,30,New York\nBob,25,San Francisco",
             "report.txt": "This is a sample report with important information about the project.",
             "config.json": '{"database": {"host": "localhost", "port": 5432}, "debug": true}',
@@ -132,11 +131,12 @@ class FileProcessingTool(BaseTool):
     
     def _run(self, operation: str, file_path: str, content: str = "", options: Dict[str, Any] = {}) -> str:
         try:
+            mock_files = self.get_mock_files()
             file_name = file_path.split("/")[-1] if "/" in file_path else file_path
             
             if operation == "read":
-                if file_name in self.mock_files:
-                    file_content = self.mock_files[file_name]
+                if file_name in mock_files:
+                    file_content = mock_files[file_name]
                     
                     # Detect file type and provide appropriate analysis
                     if file_name.endswith('.csv'):
@@ -241,14 +241,13 @@ class APICallInput(BaseModel):
     data: Optional[Dict[str, Any]] = Field(default={}, description="Request body data")
 
 class APIIntegrationTool(BaseTool):
-    name = "api_client"
-    description = "Make API calls with retry logic and error handling"
+    name: str = "api_client"
+    description: str = "Make API calls with retry logic and error handling"
     args_schema: Type[BaseModel] = APICallInput
     
-    def __init__(self):
-        super().__init__()
-        # Mock API responses
-        self.mock_apis = {
+    def get_mock_apis(self):
+        """Get mock API responses"""
+        return {
             "weather": {
                 "GET": {"temperature": 22, "condition": "sunny", "humidity": 65}
             },
@@ -268,6 +267,7 @@ class APIIntegrationTool(BaseTool):
     
     def _run(self, endpoint: str, method: str, parameters: Dict[str, Any] = {}, data: Dict[str, Any] = {}) -> str:
         try:
+            mock_apis = self.get_mock_apis()
             # Simulate API call with retry logic
             max_retries = 3
             delay = 1
@@ -279,15 +279,15 @@ class APIIntegrationTool(BaseTool):
                         raise Exception("Network timeout")
                     
                     # Check if endpoint exists
-                    if endpoint not in self.mock_apis:
-                        return f"Error: API endpoint '{endpoint}' not found. Available: {list(self.mock_apis.keys())}"
+                    if endpoint not in mock_apis:
+                        return f"Error: API endpoint '{endpoint}' not found. Available: {list(mock_apis.keys())}"
                     
                     # Check if method is supported
-                    if method not in self.mock_apis[endpoint]:
-                        return f"Error: Method '{method}' not supported for '{endpoint}'. Available: {list(self.mock_apis[endpoint].keys())}"
+                    if method not in mock_apis[endpoint]:
+                        return f"Error: Method '{method}' not supported for '{endpoint}'. Available: {list(mock_apis[endpoint].keys())}"
                     
                     # Get mock response
-                    response_data = self.mock_apis[endpoint][method].copy()
+                    response_data = mock_apis[endpoint][method].copy()
                     
                     # Apply parameters (mock filtering)
                     if parameters and endpoint == "users" and method == "GET":
@@ -327,8 +327,8 @@ class DataVisualizationInput(BaseModel):
     options: Optional[Dict[str, Any]] = Field(default={}, description="Chart options")
 
 class DataVisualizationTool(BaseTool):
-    name = "data_visualizer"
-    description = "Create data visualizations with multiple chart types"
+    name: str = "data_visualizer"
+    description: str = "Create data visualizations with multiple chart types"
     args_schema: Type[BaseModel] = DataVisualizationInput
     
     def _run(self, data_source: str, chart_type: str, data: List[Dict[str, Any]] = [], options: Dict[str, Any] = {}) -> str:
@@ -419,14 +419,13 @@ class WorkflowInput(BaseModel):
     steps: Optional[List[str]] = Field(default=[], description="Custom workflow steps")
 
 class WorkflowAutomationTool(BaseTool):
-    name = "workflow_automation"
-    description = "Execute predefined workflows and custom automation sequences"
+    name: str = "workflow_automation"
+    description: str = "Execute predefined workflows and custom automation sequences"
     args_schema: Type[BaseModel] = WorkflowInput
     
-    def __init__(self):
-        super().__init__()
-        # Predefined workflows
-        self.workflows = {
+    def get_workflows(self):
+        """Get predefined workflows"""
+        return {
             "data_analysis": [
                 "Load data from source",
                 "Clean and validate data",
@@ -459,14 +458,15 @@ class WorkflowAutomationTool(BaseTool):
     
     def _run(self, workflow_name: str, parameters: Dict[str, Any] = {}, steps: List[str] = []) -> str:
         try:
+            workflows = self.get_workflows()
             # Use custom steps if provided, otherwise use predefined workflow
             if steps:
                 workflow_steps = steps
                 workflow_name = f"Custom: {workflow_name}"
-            elif workflow_name in self.workflows:
-                workflow_steps = self.workflows[workflow_name]
+            elif workflow_name in workflows:
+                workflow_steps = workflows[workflow_name]
             else:
-                return f"Error: Workflow '{workflow_name}' not found. Available: {list(self.workflows.keys())}"
+                return f"Error: Workflow '{workflow_name}' not found. Available: {list(workflows.keys())}"
             
             # Execute workflow simulation
             execution_log = f"Workflow Execution: {workflow_name}\n"
