@@ -542,144 +542,231 @@ def create_workflow_system():
 
 # Example 3: Real-time Agent Collaboration
 async def create_realtime_collaboration():
-    """Create a real-time collaboration system between agents"""
+    """Create a real-time collaboration system between agents using actual LangChain agents"""
     print("=== Example 3: Real-time Agent Collaboration ===")
     
-    class CollaborationHub:
+    # Create LangChain agents for collaboration
+    llm = create_azure_chat_openai(temperature=0.7)
+    
+    # Collaboration tools
+    @tool
+    def share_findings(finding_type: str, content: str, priority: str = "medium") -> str:
+        """Share research findings or analysis results with the team"""
+        return f"Shared {finding_type}: {content} (Priority: {priority})"
+    
+    @tool
+    def request_assistance(task: str, required_expertise: str, urgency: str = "normal") -> str:
+        """Request assistance from team members with specific expertise"""
+        return f"Assistance requested for '{task}' requiring {required_expertise} expertise (Urgency: {urgency})"
+    
+    @tool
+    def update_project_status(task: str, status: str, progress_percentage: int, notes: str = "") -> str:
+        """Update the status of a project task"""
+        return f"Task '{task}' updated to {status} ({progress_percentage}% complete). Notes: {notes}"
+    
+    @tool
+    def collaborate_on_solution(problem: str, proposed_solution: str, feedback_request: str) -> str:
+        """Propose a solution and request feedback from team members"""
+        return f"Solution proposed for '{problem}': {proposed_solution}. Feedback needed on: {feedback_request}"
+    
+    # Create specialized agents
+    collaboration_tools = [share_findings, request_assistance, update_project_status, collaborate_on_solution]
+    
+    # Data Analyst Agent
+    analyst_prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a Senior Data Analyst in a collaborative team environment.
+
+Your expertise includes:
+- Data collection, cleaning, and validation
+- Statistical analysis and pattern recognition
+- Data visualization and reporting
+- Customer segmentation and behavior analysis
+
+In collaboration:
+- Share your findings using share_findings tool
+- Request help when you need domain expertise using request_assistance tool
+- Update your task progress using update_project_status tool
+- Propose data-driven solutions using collaborate_on_solution tool
+
+Be proactive in sharing insights and asking for clarification when needed.
+Keep your responses focused and data-driven."""),
+        ("placeholder", "{chat_history}"),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}")
+    ])
+    
+    analyst_agent = create_tool_calling_agent(llm, collaboration_tools, analyst_prompt)
+    analyst_executor = AgentExecutor(agent=analyst_agent, tools=collaboration_tools, verbose=False)
+    
+    # Business Expert Agent
+    business_prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a Business Strategy Expert in a collaborative team environment.
+
+Your expertise includes:
+- Market analysis and business strategy
+- Customer requirements and business objectives
+- ROI analysis and business case development
+- Stakeholder management and communication
+
+In collaboration:
+- Share business insights using share_findings tool
+- Request technical or analytical support using request_assistance tool
+- Update business-related task progress using update_project_status tool
+- Propose business solutions using collaborate_on_solution tool
+
+Focus on business value, strategic alignment, and practical implementation.
+Always consider the business impact of technical decisions."""),
+        ("placeholder", "{chat_history}"),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}")
+    ])
+    
+    business_agent = create_tool_calling_agent(llm, collaboration_tools, business_prompt)
+    business_executor = AgentExecutor(agent=business_agent, tools=collaboration_tools, verbose=False)
+    
+    # Technical Lead Agent  
+    technical_prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a Technical Lead in a collaborative team environment.
+
+Your expertise includes:
+- System architecture and technical design
+- Infrastructure setup and optimization
+- Technology selection and implementation
+- Technical risk assessment and mitigation
+
+In collaboration:
+- Share technical insights using share_findings tool
+- Request business or analytical input using request_assistance tool
+- Update technical task progress using update_project_status tool
+- Propose technical solutions using collaborate_on_solution tool
+
+Focus on scalability, reliability, and technical feasibility.
+Consider both current needs and future growth."""),
+        ("placeholder", "{chat_history}"),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}")
+    ])
+    
+    technical_agent = create_tool_calling_agent(llm, collaboration_tools, technical_prompt)
+    technical_executor = AgentExecutor(agent=technical_agent, tools=collaboration_tools, verbose=False)
+    
+    # Collaboration Hub with real agent integration
+    class RealTimeCollaborationHub:
         def __init__(self):
-            self.active_sessions = {}
-            self.message_queue = {}
+            self.agents = {
+                "data_analyst": analyst_executor,
+                "business_expert": business_executor, 
+                "technical_lead": technical_executor
+            }
+            self.conversation_history = []
             self.shared_workspace = {}
+            
+        async def agent_response(self, agent_name: str, message: str, context: str = "") -> str:
+            """Get response from a specific agent"""
+            if agent_name not in self.agents:
+                return f"Agent {agent_name} not found"
+            
+            agent = self.agents[agent_name]
+            
+            # Build input with context from conversation history
+            full_input = f"{context}\n\n{message}" if context else message
+            
+            try:
+                response = agent.invoke({"input": full_input})
+                return response["output"]
+            except Exception as e:
+                return f"Error from {agent_name}: {str(e)}"
         
-        def create_session(self, session_id: str, participants: List[str]):
-            """Create a new collaboration session"""
-            self.active_sessions[session_id] = {
-                "participants": participants,
-                "created": datetime.now(),
-                "messages": [],
-                "shared_data": {}
-            }
-            self.message_queue[session_id] = {participant: [] for participant in participants}
+        def add_to_history(self, agent_name: str, message: str, response: str):
+            """Add interaction to conversation history"""
+            self.conversation_history.append({
+                "timestamp": datetime.now().isoformat(),
+                "agent": agent_name,
+                "input": message,
+                "output": response
+            })
         
-        async def send_message(self, session_id: str, sender: str, message: str, data: Dict[str, Any] = {}):
-            """Send a message to all participants in a session"""
-            if session_id not in self.active_sessions:
-                return False
+        def get_conversation_context(self, last_n: int = 3) -> str:
+            """Get recent conversation context"""
+            if not self.conversation_history:
+                return ""
             
-            session = self.active_sessions[session_id]
-            timestamp = datetime.now()
+            recent = self.conversation_history[-last_n:]
+            context_parts = []
             
-            message_obj = {
-                "sender": sender,
-                "message": message,
-                "data": data,
-                "timestamp": timestamp.isoformat()
-            }
+            for entry in recent:
+                context_parts.append(f"{entry['agent']}: {entry['output']}")
             
-            session["messages"].append(message_obj)
-            
-            # Update shared data if provided
-            if data:
-                session["shared_data"].update(data)
-            
-            # Add to message queues for other participants
-            for participant in session["participants"]:
-                if participant != sender:
-                    self.message_queue[session_id][participant].append(message_obj)
-            
-            return True
-        
-        def get_messages(self, session_id: str, participant: str) -> List[Dict[str, Any]]:
-            """Get pending messages for a participant"""
-            if session_id not in self.message_queue or participant not in self.message_queue[session_id]:
-                return []
-            
-            messages = self.message_queue[session_id][participant].copy()
-            self.message_queue[session_id][participant].clear()  # Clear after reading
-            
-            return messages
-        
-        def get_shared_data(self, session_id: str) -> Dict[str, Any]:
-            """Get shared workspace data"""
-            if session_id not in self.active_sessions:
-                return {}
-            
-            return self.active_sessions[session_id]["shared_data"]
+            return "Recent team conversation:\n" + "\n".join(context_parts)
     
-    # Create collaboration hub
-    hub = CollaborationHub()
+    # Initialize collaboration
+    hub = RealTimeCollaborationHub()
     
-    # Simulate collaborative problem-solving session
-    session_id = "project_analysis_2024"
-    participants = ["data_analyst", "business_expert", "technical_lead"]
+    print("🤝 Real-time Agent Collaboration with LangChain:")
+    print("Participants: Data Analyst, Business Expert, Technical Lead")
+    print("-" * 60)
     
-    hub.create_session(session_id, participants)
-    
-    print("🤝 Real-time Agent Collaboration Simulation:")
-    print(f"Session: {session_id}")
-    print(f"Participants: {', '.join(participants)}")
-    print("-" * 50)
-    
-    # Simulate collaboration sequence
-    collaboration_sequence = [
+    # Collaboration scenario: Q4 Performance Analysis Project
+    collaboration_steps = [
         {
-            "sender": "business_expert",
-            "message": "We need to analyze Q4 performance data to identify growth opportunities",
-            "data": {"project": "Q4_analysis", "priority": "high", "deadline": "2024-01-15"}
+            "agent": "business_expert",
+            "message": "We need to analyze Q4 performance data to identify growth opportunities for 2024. The board wants insights on customer segments and revenue optimization."
         },
         {
-            "sender": "data_analyst", 
-            "message": "I'll start with data collection and preliminary analysis",
-            "data": {"task": "data_collection", "status": "in_progress", "estimated_completion": "2h"}
+            "agent": "data_analyst", 
+            "message": "I'll analyze the Q4 data. What specific metrics should I focus on, and do we have access to customer behavior data?"
         },
         {
-            "sender": "technical_lead",
-            "message": "I'll set up the infrastructure and analysis tools needed",
-            "data": {"task": "infrastructure_setup", "tools": ["Python", "SQL", "Tableau"], "status": "ready"}
+            "agent": "technical_lead",
+            "message": "I can set up the data pipeline and analysis infrastructure. What's our timeline and what tools should we prioritize?"
         },
         {
-            "sender": "data_analyst",
-            "message": "Data collection complete. Found interesting patterns in customer segments",
-            "data": {"task": "data_collection", "status": "completed", "findings": "3 distinct customer segments identified"}
+            "agent": "business_expert",
+            "message": "Timeline is 2 weeks. Focus on customer lifetime value, churn prediction, and segment profitability. We need actionable recommendations."
         },
         {
-            "sender": "business_expert",
-            "message": "Great! Can you focus on the high-value segment behavior?",
-            "data": {"focus_area": "high_value_customers", "metrics": ["retention", "lifetime_value", "growth_rate"]}
+            "agent": "data_analyst",
+            "message": "I've found 3 distinct customer segments with different value patterns. The high-value segment shows declining engagement. Should I dive deeper?"
         },
         {
-            "sender": "technical_lead",
-            "message": "I've prepared the visualization dashboard for real-time monitoring",
-            "data": {"dashboard": "ready", "url": "https://dashboard.company.com/q4-analysis", "features": ["real-time", "interactive"]}
+            "agent": "technical_lead",
+            "message": "I'll create a real-time monitoring dashboard for these segments. What visualization requirements do we have for the board presentation?"
         }
     ]
     
-    # Execute collaboration sequence
-    for step in collaboration_sequence:
-        await hub.send_message(
-            session_id,
-            step["sender"],
-            step["message"],
-            step.get("data", {})
-        )
+    # Execute real collaboration
+    for i, step in enumerate(collaboration_steps, 1):
+        agent_name = step["agent"]
+        message = step["message"]
         
-        print(f"💬 {step['sender']}: {step['message']}")
+        print(f"\n🎯 Step {i}: {agent_name.replace('_', ' ').title()}")
+        print(f"💬 Input: {message}")
+        print("-" * 40)
         
-        # Show how other participants receive updates
-        for participant in participants:
-            if participant != step["sender"]:
-                messages = hub.get_messages(session_id, participant)
-                if messages:
-                    latest_message = messages[-1]
-                    print(f"  📨 {participant} received update: {latest_message['message'][:50]}...")
+        # Get context from previous conversations
+        context = hub.get_conversation_context() if i > 1 else ""
         
-        print()
-        await asyncio.sleep(0.5)  # Simulate real-time delays
+        # Get agent response
+        response = await hub.agent_response(agent_name, message, context)
+        
+        # Add to history
+        hub.add_to_history(agent_name, message, response)
+        
+        print(f"🤖 Agent Response: {response}")
+        
+        # Simulate brief pause for real-time feel
+        await asyncio.sleep(0.5)
     
-    # Show final shared workspace
-    print("📊 Final Shared Workspace Data:")
-    shared_data = hub.get_shared_data(session_id)
-    print(json.dumps(shared_data, indent=2))
+    # Show collaboration summary
+    print(f"\n📊 Collaboration Summary:")
+    print(f"Total interactions: {len(hub.conversation_history)}")
+    print(f"Agents participated: {len(set(entry['agent'] for entry in hub.conversation_history))}")
+    
+    # Show final conversation history
+    print(f"\n� Complete Conversation History:")
+    for entry in hub.conversation_history:
+        agent_name = entry['agent'].replace('_', ' ').title()
+        print(f"\n{agent_name}: {entry['output'][:100]}...")
     
     print("\n" + "="*60 + "\n")
 
@@ -697,7 +784,7 @@ if __name__ == "__main__":
         
         # Run orchestration examples
         # create_hierarchical_system()
-        create_workflow_system()
+        # create_workflow_system()
         
         # Run async collaboration example
         print("🔄 Running async collaboration example...")
