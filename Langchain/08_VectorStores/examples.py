@@ -21,6 +21,9 @@ from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain.memory import ConversationBufferMemory
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
 import numpy as np
 from typing import List, Dict, Any, Optional
 import json
@@ -368,8 +371,8 @@ def rag_integration_example():
         collection_name="rag_knowledge_base"
     )
     
-    # Create retrieval chain
-    retrieval_qa = RetrievalQA.from_chain_type(
+    # Create retrieval chain - LEGACY APPROACH
+    retrieval_qa_legacy = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
         retriever=vector_store.as_retriever(
@@ -377,10 +380,45 @@ def rag_integration_example():
             search_kwargs={"k": 3}
         ),
         return_source_documents=True,
-        verbose=False
+        verbose=True
     )
     
-    print("✅ RAG system initialized!")
+    # Modern LCEL Approach - RECOMMENDED
+    print("🚀 Creating modern LCEL RAG chain...")
+    
+    # Define the RAG prompt template
+    rag_prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a helpful AI assistant. Use the following context to answer the user's question accurately and comprehensively. 
+        
+Context:
+{context}
+
+If the answer cannot be found in the context, say "I don't have enough information in the provided context to answer that question."""),
+        ("human", "{question}")
+    ])
+    
+    # Create the retriever
+    retriever = vector_store.as_retriever(
+        search_type="similarity", 
+        search_kwargs={"k": 3}
+    )
+    
+    # Helper function to format documents
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+    
+    # Modern LCEL chain
+    modern_rag_chain = (
+        {
+            "context": retriever | format_docs,
+            "question": RunnablePassthrough()
+        }
+        | rag_prompt
+        | llm
+        | StrOutputParser()
+    )
+    
+    print("✅ RAG systems initialized!")
     
     # Test RAG with different questions
     test_questions = [
@@ -391,21 +429,45 @@ def rag_integration_example():
         "How can I improve my prompts for better LLM responses?"
     ]
     
-    print(f"\n🤖 Testing RAG system:")
+    print(f"\n🤖 Testing RAG systems (Legacy vs Modern):")
     
-    for question in test_questions:
-        print(f"\n❓ Question: {question}")
-        print("-" * 50)
+    for i, question in enumerate(test_questions, 1):
+        print(f"\n{'='*60}")
+        print(f"❓ Question {i}: {question}")
+        print("="*60)
         
-        # Get RAG response
-        result = retrieval_qa.invoke({"query": question})
+        # Legacy approach
+        print(f"\n🔶 LEGACY RetrievalQA:")
+        try:
+            legacy_result = retrieval_qa_legacy.invoke({"query": question})
+            print(f"Answer: {legacy_result['result']}")
+            print(f"Sources: {len(legacy_result['source_documents'])} documents")
+        except Exception as e:
+            print(f"Error: {e}")
         
-        print(f"🎯 Answer: {result['result']}")
-        print(f"\n📖 Sources used:")
+        # Modern LCEL approach
+        print(f"\n🚀 MODERN LCEL Chain:")
+        try:
+            # Get retrieved documents for comparison
+            retrieved_docs = retriever.get_relevant_documents(question)
+            
+            # Get modern response
+            modern_result = modern_rag_chain.invoke(question)
+            print(f"Answer: {modern_result}")
+            print(f"Sources: {len(retrieved_docs)} documents retrieved")
+            
+            # Show sources used
+            print(f"\n📖 Sources used:")
+            for j, doc in enumerate(retrieved_docs, 1):
+                print(f"  {j}. {doc.metadata.get('source', 'Unknown')} ({doc.metadata.get('type', 'Unknown')})")
+                print(f"     Content: {doc.page_content[:100]}...")
+                
+        except Exception as e:
+            print(f"Error: {e}")
         
-        for i, doc in enumerate(result['source_documents'], 1):
-            print(f"  {i}. {doc.metadata.get('source', 'Unknown')} ({doc.metadata.get('type', 'Unknown')})")
-            print(f"     Content: {doc.page_content[:100]}...")
+        if i < len(test_questions):  # Don't wait after last question
+            print(f"\n⏸️  Press Enter to continue to next question...")
+            # input()  # Uncomment to pause between questions
     
     # Demonstrate retrieval without generation
     print(f"\n🔍 Pure Retrieval Example:")
@@ -420,6 +482,115 @@ def rag_integration_example():
     for i, doc in enumerate(retrieved_docs, 1):
         print(f"  {i}. {doc.page_content}")
         print(f"     Metadata: {doc.metadata}")
+    
+    # Advanced Modern RAG Examples
+    print(f"\n🎯 Advanced Modern RAG Patterns:")
+    
+    # 1. RAG with source citation
+    print(f"\n📚 1. RAG with Source Citations:")
+    
+    citation_prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a helpful AI assistant. Use the following context to answer the user's question. 
+        Always cite your sources using [Source: filename] format.
+        
+Context:
+{context}
+
+Provide a comprehensive answer and cite each source used."""),
+        ("human", "{question}")
+    ])
+    
+    def format_docs_with_sources(docs):
+        formatted = []
+        for i, doc in enumerate(docs, 1):
+            source = doc.metadata.get('source', f'Document_{i}')
+            content = f"[Source: {source}]\n{doc.page_content}"
+            formatted.append(content)
+        return "\n\n".join(formatted)
+    
+    citation_chain = (
+        {
+            "context": retriever | format_docs_with_sources,
+            "question": RunnablePassthrough()
+        }
+        | citation_prompt
+        | llm
+        | StrOutputParser()
+    )
+    
+    citation_result = citation_chain.invoke("What is RAG and how does it work?")
+    print(f"Answer with citations: {citation_result}")
+    
+    # 2. Multi-step RAG (with follow-up questions)
+    print(f"\n🔄 2. Multi-step RAG Chain:")
+    
+    multistep_prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a helpful AI assistant. Based on the context provided, answer the question comprehensively.
+        If the question requires multiple aspects to be covered, structure your answer clearly.
+        
+Context:
+{context}"""),
+        ("human", "{question}")
+    ])
+    
+    # Chain that can handle complex queries
+    multistep_chain = (
+        {
+            "context": retriever | format_docs,
+            "question": RunnablePassthrough()
+        }
+        | multistep_prompt
+        | llm
+        | StrOutputParser()
+    )
+    
+    complex_question = "Compare LangChain and vector stores, and explain how they work together in RAG applications"
+    multistep_result = multistep_chain.invoke(complex_question)
+    print(f"Complex question: {complex_question}")
+    print(f"Structured answer: {multistep_result}")
+    
+    # 3. RAG with conditional logic
+    print(f"\n🧠 3. Conditional RAG (different responses based on context quality):")
+    
+    conditional_prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a helpful AI assistant. Use the following context to answer the user's question.
+
+Context:
+{context}
+
+Instructions:
+- If the context contains relevant information, provide a detailed answer
+- If the context is somewhat related but not directly relevant, acknowledge this and provide what insight you can
+- If the context is not relevant at all, clearly state that you don't have relevant information
+
+Always be honest about the limitations of your knowledge based on the provided context."""),
+        ("human", "{question}")
+    ])
+    
+    conditional_chain = (
+        {
+            "context": retriever | format_docs,
+            "question": RunnablePassthrough()
+        }
+        | conditional_prompt
+        | llm
+        | StrOutputParser()
+    )
+    
+    # Test with a question that might not have good context
+    edge_case_question = "What is the weather like today?"
+    conditional_result = conditional_chain.invoke(edge_case_question)
+    print(f"Edge case question: {edge_case_question}")
+    print(f"Conditional response: {conditional_result}")
+    
+    print(f"\n💡 Key Advantages of Modern LCEL Approach:")
+    print(f"✅ More flexible and customizable")
+    print(f"✅ Better error handling and debugging")
+    print(f"✅ Easier to modify prompts and logic")
+    print(f"✅ Supports streaming and async operations")
+    print(f"✅ Better integration with LangSmith tracing")
+    print(f"✅ More explicit data flow")
+    print(f"✅ Easier to add custom processing steps")
     
     print("\n" + "="*60 + "\n")
 
@@ -584,9 +755,9 @@ if __name__ == "__main__":
         print()
         
         # Run all examples
-        embedding_basics_example()
-        chromadb_vector_store_example()
-        faiss_vector_store_example()
+        # embedding_basics_example()
+        # chromadb_vector_store_example()
+        # faiss_vector_store_example()
         rag_integration_example()
         advanced_vector_operations_example()
         
