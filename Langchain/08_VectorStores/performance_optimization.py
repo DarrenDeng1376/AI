@@ -221,7 +221,7 @@ def batch_processing_example():
         
         return dataset
     
-    dataset_size = 500
+    dataset_size = 100
     print(f"📊 Generating dataset with {dataset_size} documents...")
     
     large_dataset = generate_large_dataset(dataset_size)
@@ -802,7 +802,7 @@ if __name__ == "__main__":
     
     try:
         # Run optimization examples
-        index_optimization_example()
+        # index_optimization_example()
         batch_processing_example()
         caching_and_persistence_example()
         scaling_strategies_example()
