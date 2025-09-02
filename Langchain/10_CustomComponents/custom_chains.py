@@ -83,14 +83,41 @@ def create_customer_service_chain():
         - Category: {category}
         - Tier: {customer_tier}
         
-        Generate a helpful, professional response that:
-        1. Addresses their specific concern
-        2. Provides actionable solutions
-        3. Suggests appropriate follow-up actions
-        4. Indicates if escalation is needed
-        5. Estimates resolution time
+        **Our Service Offerings:**
         
-        Be empathetic, clear, and solution-focused."""),
+        🔹 **Standard Plan** ($29/month)
+        - Up to 10,000 API calls/month
+        - Basic Azure OpenAI access
+        - Email support
+        - Community forum access
+        
+        🔹 **Professional Plan** ($99/month)
+        - Up to 100,000 API calls/month
+        - Advanced Azure OpenAI models (GPT-4, etc.)
+        - Priority email & chat support
+        - Custom integration assistance
+        - SLA: 24-hour response
+        
+        🔹 **Enterprise Plan** ($299/month)
+        - Unlimited API calls
+        - Premium Azure OpenAI access
+        - Dedicated support manager
+        - Custom model fine-tuning
+        - Priority technical assistance
+        - SLA: 4-hour response
+        - Custom deployment options
+        
+        Generate a helpful, professional response that:
+        1. Addresses their specific concern directly
+        2. Provides actionable solutions or detailed information
+        3. Suggests appropriate follow-up actions
+        4. Uses a warm, empathetic tone
+        5. Estimates resolution time when applicable
+        
+        For technical issues, provide troubleshooting steps.
+        For pricing inquiries, highlight relevant plan features.
+        For billing issues, acknowledge the concern and offer immediate assistance.
+        For integration questions, provide specific guidance."""),
         ("human", "Customer Query: {query}")
     ])
     
@@ -115,24 +142,39 @@ def create_customer_service_chain():
                 "customer_tier": "standard"
             }
     
+    # Build the LCEL chain with proper query passing
+    def analyze_and_respond(query_input):
+        """Process query through analysis and response generation"""
+        # Extract the actual query string
+        if isinstance(query_input, dict):
+            query = query_input.get("query", "")
+        else:
+            query = str(query_input)
+        
+        if not query:
+            return "I apologize, but I didn't receive your query. Could you please restate your question?"
+        
+        try:
+            # Step 1: Analyze the query
+            analysis_result = (analysis_prompt | llm | StrOutputParser()).invoke({"query": query})
+            analysis = parse_analysis(analysis_result)
+            
+            # Step 2: Generate response with analysis and original query
+            response_input = {
+                "query": query,
+                **analysis
+            }
+            response = (response_prompt | llm | StrOutputParser()).invoke(response_input)
+            
+            return response
+            
+        except Exception as e:
+            return f"I apologize for the technical difficulty. Please try again or contact support. Error: {str(e)}"
+    
     # Build the LCEL chain
     chain = (
-        # Step 1: Analyze the query
-        {"query": RunnablePassthrough()}
-        | RunnableLambda(lambda x: {"query": x["query"]})
-        | analysis_prompt
-        | llm
-        | StrOutputParser()
-        | RunnableLambda(parse_analysis)
-        # Step 2: Combine analysis with original query
-        | RunnableLambda(lambda analysis: {
-            "query": analysis.get("original_query", ""),
-            **analysis
-        })
-        # Step 3: Generate response based on analysis
-        | response_prompt
-        | llm
-        | StrOutputParser()
+        RunnablePassthrough()
+        | RunnableLambda(analyze_and_respond)
     )
     
     return chain

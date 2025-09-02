@@ -47,21 +47,38 @@ class AzurePersistentMemory(BaseChatMemory):
     Custom memory that persists conversations to Azure storage
     """
     
-    def __init__(
-        self,
-        session_id: str,
-        user_id: str = "default",
-        max_token_limit: int = 2000,
-        return_messages: bool = True,
-        storage_path: str = "./memory_storage.db"
-    ):
-        super().__init__(return_messages=return_messages)
-        self.session_id = session_id
-        self.user_id = user_id
-        self.max_token_limit = max_token_limit
-        self.storage_path = storage_path
+    session_id: str = Field(description="Session identifier for the conversation")
+    user_id: str = Field(default="default", description="User identifier")
+    max_token_limit: int = Field(default=2000, description="Maximum tokens before compression")
+    storage_path: str = Field(default="./memory_storage.db", description="SQLite database path")
+    
+    class Config:
+        arbitrary_types_allowed = True
+        # Allow extra attributes for database connection
+        extra = "allow"
+    
+    def __init__(self, **kwargs):
+        # Set default input and output keys if not provided
+        if 'input_key' not in kwargs:
+            kwargs['input_key'] = 'input'
+        if 'output_key' not in kwargs:
+            kwargs['output_key'] = 'output'
+        
+        super().__init__(**kwargs)
+        # Initialize connection as a private attribute
+        object.__setattr__(self, '_conn', None)
         self._init_storage()
         self._load_messages()
+    
+    @property
+    def conn(self):
+        """Get database connection"""
+        return self._conn
+    
+    @conn.setter
+    def conn(self, value):
+        """Set database connection"""
+        object.__setattr__(self, '_conn', value)
     
     def _init_storage(self):
         """Initialize SQLite storage for conversations"""
@@ -223,6 +240,23 @@ class AzurePersistentMemory(BaseChatMemory):
         super().clear()
         self._clear_old_messages()
     
+    def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Load memory variables for the chain"""
+        # Return conversation history formatted for prompts
+        if self.return_messages:
+            return {"history": self.chat_memory.messages}
+        else:
+            # Return as string format
+            history_str = ""
+            for message in self.chat_memory.messages:
+                if isinstance(message, HumanMessage):
+                    history_str += f"Human: {message.content}\n"
+                elif isinstance(message, AIMessage):
+                    history_str += f"AI: {message.content}\n"
+                elif isinstance(message, SystemMessage):
+                    history_str += f"System: {message.content}\n"
+            return {"history": history_str}
+    
     @property
     def memory_variables(self) -> List[str]:
         """Return memory variables"""
@@ -238,21 +272,40 @@ class SemanticMemory(BaseMemory):
     Memory that uses embeddings to retrieve contextually relevant past conversations
     """
     
-    def __init__(
-        self,
-        user_id: str = "default",
-        max_memories: int = 10,
-        similarity_threshold: float = 0.7
-    ):
-        self.user_id = user_id
-        self.max_memories = max_memories
-        self.similarity_threshold = similarity_threshold
-        self.embeddings = create_azure_openai_embeddings()
+    user_id: str = Field(default="default", description="User identifier")
+    max_memories: int = Field(default=10, description="Maximum number of memories to store")
+    similarity_threshold: float = Field(default=0.7, description="Minimum similarity threshold for retrieval")
+    
+    class Config:
+        arbitrary_types_allowed = True
+        extra = "allow"
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Initialize embeddings and memory store as private attributes
+        object.__setattr__(self, '_embeddings', create_azure_openai_embeddings())
+        object.__setattr__(self, '_memories', [])
         self._init_memory_store()
+    
+    @property
+    def embeddings(self):
+        """Get embeddings client"""
+        return self._embeddings
+    
+    @property
+    def memories(self):
+        """Get memories list"""
+        return self._memories
+    
+    @memories.setter
+    def memories(self, value):
+        """Set memories list"""
+        object.__setattr__(self, '_memories', value)
     
     def _init_memory_store(self):
         """Initialize in-memory store for semantic memories"""
-        self.memories = []  # List of {"content": str, "embedding": List[float], "timestamp": str, "importance": float}
+        # memories property is already initialized in __init__
+        pass
     
     def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, str]) -> None:
         """Save conversation context with semantic embedding"""
@@ -402,10 +455,21 @@ class MultiUserConversationManager:
             memory = self.get_or_create_memory(user_id, session_id)
             
             # Build prompt with memory
+            # Format shared context properly
+            shared_context_str = ""
+            if include_shared_context and self.shared_context:
+                context_items = []
+                for key, value in self.shared_context.items():
+                    if isinstance(value, dict):
+                        context_items.append(f"- {key}: {value.get('value', value)}")
+                    else:
+                        context_items.append(f"- {key}: {value}")
+                shared_context_str = "Shared team context:\n" + "\n".join(context_items)
+            
             prompt = ChatPromptTemplate.from_messages([
                 ("system", f"""You are a helpful assistant. Remember the conversation context for user {user_id}.
                 
-                {"Shared team context: " + str(self.shared_context) if include_shared_context and self.shared_context else ""}
+                {shared_context_str}
                 """),
                 MessagesPlaceholder(variable_name="history"),
                 ("human", "{input}")
