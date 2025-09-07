@@ -15,7 +15,7 @@ class AzureConfig:
     
     # Document Intelligence
     document_intelligence_endpoint: str = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "")
-    document_intelligence_key: str = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY", "")
+    document_intelligence_key: str = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY", "")  # Optional - will use default credentials if not provided
     
     # OpenAI - Using default Azure credentials
     openai_endpoint: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")
@@ -23,6 +23,8 @@ class AzureConfig:
     openai_api_version: str = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01")
     openai_deployment_name: str = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "")
     openai_embedding_deployment: str = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "")
+    
+    # Authentication - applies to both services
     use_default_credentials: bool = os.getenv("AZURE_USE_DEFAULT_CREDENTIALS", "true").lower() == "true"
     
     def validate(self) -> List[str]:
@@ -31,8 +33,11 @@ class AzureConfig:
         
         if not self.document_intelligence_endpoint:
             missing.append("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
-        if not self.document_intelligence_key:
-            missing.append("AZURE_DOCUMENT_INTELLIGENCE_KEY")
+        
+        # Only require Document Intelligence key if not using default credentials
+        if not self.use_default_credentials and not self.document_intelligence_key:
+            missing.append("AZURE_DOCUMENT_INTELLIGENCE_KEY (or set AZURE_USE_DEFAULT_CREDENTIALS=true)")
+            
         if not self.openai_endpoint:
             missing.append("AZURE_OPENAI_ENDPOINT")
         

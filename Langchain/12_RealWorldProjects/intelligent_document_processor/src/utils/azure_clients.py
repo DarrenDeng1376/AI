@@ -29,11 +29,24 @@ class AzureClientManager:
         """Get Document Intelligence client with lazy initialization"""
         if self._document_intelligence_client is None:
             try:
-                self._document_intelligence_client = DocumentAnalysisClient(
-                    endpoint=azure_config.document_intelligence_endpoint,
-                    credential=AzureKeyCredential(azure_config.document_intelligence_key)
-                )
-                logger.info("Document Intelligence client initialized")
+                if azure_config.use_default_credentials and not azure_config.document_intelligence_key:
+                    # Use Azure Default Credentials
+                    from azure.identity import DefaultAzureCredential
+                    credential = DefaultAzureCredential()
+                    
+                    self._document_intelligence_client = DocumentAnalysisClient(
+                        endpoint=azure_config.document_intelligence_endpoint,
+                        credential=credential
+                    )
+                    logger.info("Document Intelligence client initialized with default credentials")
+                else:
+                    # Use API key
+                    self._document_intelligence_client = DocumentAnalysisClient(
+                        endpoint=azure_config.document_intelligence_endpoint,
+                        credential=AzureKeyCredential(azure_config.document_intelligence_key)
+                    )
+                    logger.info("Document Intelligence client initialized with API key")
+                    
             except Exception as e:
                 logger.error(f"Failed to initialize Document Intelligence client: {e}")
                 raise
@@ -285,10 +298,12 @@ def validate_azure_configuration() -> List[str]:
     elif not azure_config.document_intelligence_endpoint.startswith("https://"):
         issues.append("Document Intelligence endpoint should start with https://")
     
-    if not azure_config.document_intelligence_key:
-        issues.append("Document Intelligence key not configured")
-    elif len(azure_config.document_intelligence_key) < 32:
-        issues.append("Document Intelligence key appears to be invalid (too short)")
+    # Only check key if not using default credentials
+    if not azure_config.use_default_credentials:
+        if not azure_config.document_intelligence_key:
+            issues.append("Document Intelligence key not configured (or set AZURE_USE_DEFAULT_CREDENTIALS=true)")
+        elif len(azure_config.document_intelligence_key) < 32:
+            issues.append("Document Intelligence key appears to be invalid (too short)")
     
     # Check Azure OpenAI configuration
     if not azure_config.openai_endpoint:
@@ -296,10 +311,12 @@ def validate_azure_configuration() -> List[str]:
     elif not azure_config.openai_endpoint.startswith("https://"):
         issues.append("Azure OpenAI endpoint should start with https://")
     
-    if not azure_config.openai_api_key:
-        issues.append("Azure OpenAI API key not configured")
-    elif len(azure_config.openai_api_key) < 32:
-        issues.append("Azure OpenAI API key appears to be invalid (too short)")
+    # Only check API key if not using default credentials
+    if not azure_config.use_default_credentials:
+        if not azure_config.openai_api_key:
+            issues.append("Azure OpenAI API key not configured (or set AZURE_USE_DEFAULT_CREDENTIALS=true)")
+        elif len(azure_config.openai_api_key) < 32:
+            issues.append("Azure OpenAI API key appears to be invalid (too short)")
     
     if not azure_config.openai_deployment_name:
         issues.append("Azure OpenAI deployment name not configured")

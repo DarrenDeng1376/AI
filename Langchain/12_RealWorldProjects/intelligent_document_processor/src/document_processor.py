@@ -10,10 +10,10 @@ import io
 
 from azure.ai.formrecognizer import DocumentAnalysisClient
 from azure.ai.formrecognizer.models import AnalyzeResult
-from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import AzureError
 
 from config import azure_config, app_config
+from .utils.azure_clients import AzureClientManager
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +44,8 @@ class DocumentProcessor:
     def __init__(self):
         """Initialize the document processor"""
         try:
-            self.client = DocumentAnalysisClient(
-                endpoint=azure_config.document_intelligence_endpoint,
-                credential=AzureKeyCredential(azure_config.document_intelligence_key)
-            )
+            self.client_manager = AzureClientManager()
+            self.client = self.client_manager.get_document_intelligence_client()
             logger.info("Document Intelligence client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Document Intelligence client: {e}")

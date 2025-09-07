@@ -70,7 +70,6 @@ pip install -r requirements.txt
    ```bash
    # Azure Document Intelligence (extracts text, tables, structure from documents)
    AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
-   AZURE_DOCUMENT_INTELLIGENCE_KEY=your_key_here
    
    # Azure OpenAI
    AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
@@ -81,9 +80,10 @@ pip install -r requirements.txt
    # Option 1: Use Azure Default Credentials (recommended)
    AZURE_USE_DEFAULT_CREDENTIALS=true
    
-   # Option 2: Use API Key (for local development)
+   # Option 2: Use API Keys (for local development)
    # AZURE_USE_DEFAULT_CREDENTIALS=false
-   # AZURE_OPENAI_API_KEY=your_api_key_here
+   # AZURE_DOCUMENT_INTELLIGENCE_KEY=your_doc_intel_key_here
+   # AZURE_OPENAI_API_KEY=your_openai_key_here
    ```
 
 #### Step 3: Create Required Directories

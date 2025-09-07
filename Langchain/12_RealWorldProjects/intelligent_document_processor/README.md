@@ -122,14 +122,21 @@ intelligent_document_processor/
 ```bash
 # Azure Document Intelligence
 AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=your_endpoint
-AZURE_DOCUMENT_INTELLIGENCE_KEY=your_key
 
 # Azure OpenAI
 AZURE_OPENAI_ENDPOINT=your_endpoint
-AZURE_OPENAI_API_KEY=your_key
 AZURE_OPENAI_API_VERSION=2024-02-01
 AZURE_OPENAI_DEPLOYMENT_NAME=your_gpt4_deployment
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT=your_embedding_deployment
+
+# Authentication (choose one):
+# Option 1: Use Azure Default Credentials (recommended)
+AZURE_USE_DEFAULT_CREDENTIALS=true
+
+# Option 2: Use API Keys (for local development)
+# AZURE_USE_DEFAULT_CREDENTIALS=false
+# AZURE_DOCUMENT_INTELLIGENCE_KEY=your_doc_intel_key
+# AZURE_OPENAI_API_KEY=your_openai_key
 
 # Application Settings
 VECTOR_STORE_PATH=./data/vector_store

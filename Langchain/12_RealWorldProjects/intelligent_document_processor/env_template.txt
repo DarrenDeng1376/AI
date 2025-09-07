@@ -4,7 +4,6 @@
 # Azure Document Intelligence Configuration
 # This service extracts text, tables, and structure from documents (PDFs, images, Office docs)
 AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=https://your-document-intelligence-resource.cognitiveservices.azure.com/
-AZURE_DOCUMENT_INTELLIGENCE_KEY=your_document_intelligence_key_here
 
 # Azure OpenAI Configuration
 AZURE_OPENAI_ENDPOINT=https://your-openai-resource.openai.azure.com/
@@ -14,10 +13,12 @@ AZURE_OPENAI_EMBEDDING_DEPLOYMENT=your_embedding_deployment_name
 
 # Authentication Method (choose one):
 # Option 1: Use Azure Default Credentials (recommended for Azure-hosted apps)
+# This uses Azure CLI login, Managed Identity, or other Azure authentication methods
 AZURE_USE_DEFAULT_CREDENTIALS=true
 
-# Option 2: Use API Key (for local development or non-Azure environments)
+# Option 2: Use API Keys (for local development or non-Azure environments)
 # AZURE_USE_DEFAULT_CREDENTIALS=false
+# AZURE_DOCUMENT_INTELLIGENCE_KEY=your_document_intelligence_key_here
 # AZURE_OPENAI_API_KEY=your_openai_api_key_here
 
 # Application Settings
