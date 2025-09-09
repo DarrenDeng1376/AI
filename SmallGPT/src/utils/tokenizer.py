@@ -195,12 +195,16 @@ class SimpleTokenizer:
         if len(word) <= 1:
             return [word]
         
-        pairs = [(word[i], word[i + 1]) for i in range(len(word) - 1)]
-        
-        if not pairs:
-            return [word]
+        # Start with individual characters as tokens
+        word_tokens = list(word)
         
         while True:
+            # Get pairs from current tokens
+            pairs = [(word_tokens[i], word_tokens[i + 1]) for i in range(len(word_tokens) - 1)]
+            
+            if not pairs:
+                break
+            
             # Find the earliest merge that applies
             bigram = None
             min_merge_idx = float('inf')
@@ -215,43 +219,42 @@ class SimpleTokenizer:
             if bigram is None:
                 break
             
-            # Apply the merge
+            # Apply the merge - replace first occurrence of the pair
             first, second = bigram
-            new_word = []
+            new_word_tokens = []
             i = 0
             
-            while i < len(word):
-                if i < len(word) - 1 and word[i] == first and word[i + 1] == second:
-                    new_word.append(first + second)
+            while i < len(word_tokens):
+                if (i < len(word_tokens) - 1 and 
+                    word_tokens[i] == first and 
+                    word_tokens[i + 1] == second):
+                    # Merge the pair into a single token
+                    new_word_tokens.append(first + second)
                     i += 2
                 else:
-                    new_word.append(word[i])
+                    new_word_tokens.append(word_tokens[i])
                     i += 1
             
-            word = ''.join(new_word)
+            word_tokens = new_word_tokens
             
-            if len(word) == 1:
+            # Stop if we have only one token left
+            if len(word_tokens) <= 1:
                 break
-            
-            pairs = [(word[i], word[i + 1]) for i in range(len(word) - 1)]
         
-        # Split into subwords
-        subwords = []
-        current_word = ""
-        
-        for char in word:
-            test_word = current_word + char
-            if test_word in self.token_to_id:
-                current_word = test_word
+        # Filter out tokens that don't exist in vocabulary
+        # and split unknown tokens back to characters if needed
+        final_subwords = []
+        for token in word_tokens:
+            if token in self.token_to_id:
+                final_subwords.append(token)
             else:
-                if current_word:
-                    subwords.append(current_word)
-                current_word = char
+                # If merged token not in vocab, split back to individual chars
+                for char in token:
+                    if char in self.token_to_id:
+                        final_subwords.append(char)
+                    # If even individual char not in vocab, it will be handled as UNK in encode()
         
-        if current_word:
-            subwords.append(current_word)
-        
-        return subwords
+        return final_subwords if final_subwords else word_tokens
     
     def encode(self, text: str, add_special_tokens: bool = True) -> List[int]:
         """

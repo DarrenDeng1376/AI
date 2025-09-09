@@ -73,7 +73,7 @@ def quick_train_example():
     # Load configuration
     config = create_small_config()
     config.training.data_dir = str(data_dir)
-    config.training.max_steps = 1000  # Very short training for demo
+    config.training.max_steps = 10  # Very short training for demo
     config.training.log_interval = 50
     config.training.eval_interval = 200
     config.training.save_interval = 500
